@@ -32,6 +32,12 @@ subscription or namespace advertisement stays active. Cancellation uses
 subscriber priority; other changes are refused with `NOT_SUPPORTED` and end
 the subscription with `UPDATE_FAILED`. Drafts 17 and 18 retain FIN cancellation.
 
+Rust and JavaScript accept repeated unknown `SETUP` options, including GREASE,
+while still requiring every value to be well-formed. Repeated known options
+are rejected. On draft-17 and later, a `GROUP_ORDER` message parameter must be
+Ascending (1) or Descending (2); any other value closes the session with
+`PROTOCOL_VIOLATION`.
+
 Rust and JavaScript subscribers accept object extension blocks up to 64 KiB.
 This is an implementation limit, not a limit in the IETF draft. A larger
 declared block stops its subgroup stream with `MALFORMED_TRACK` before reading
