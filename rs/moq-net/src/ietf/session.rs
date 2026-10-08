@@ -1746,7 +1746,7 @@ mod tests {
 				let session =
 					crate::lite::test_transport::ScriptedSession::new(Vec::new()).with_incoming_bidis(vec![payload]);
 				let log = session.log.clone();
-				let (driver, _goaway) = start(Config {
+				let (driver, _goaway, _) = start(Config {
 					runtime: crate::time::Clock::sim(),
 					session,
 					setup: None,
