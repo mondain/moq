@@ -46,14 +46,14 @@ The same pair of relays can be upstream of each other for different namespaces.
 {{moqt}} is designed to deliver content through a mesh of relays but does not say how to build one, and the base protocol does not carry enough information to do so.
 Relays that simply forward PUBLISH_NAMESPACE to each other break down: advertisements loop forever, and a relay that hears one namespace from two peers has no basis for choosing where to send a SUBSCRIBE.
 
-This extension adds two parameters to PUBLISH_NAMESPACE and NAMESPACE.
+This extension adds two parameters to PUBLISH_NAMESPACE, PUBLISH, and NAMESPACE.
 HOP_PATH lists every endpoint an advertisement has passed through, starting with the original publisher, which breaks loops and lets paths be compared.
 ROUTE_COST is the accumulated price of the path: the publisher seeds it, and each hop adds the RELAY_COST its upstream declared at setup, so an unpriced mesh ranks by hop count.
 A relay that already carries a namespace advertises a lower cost, steering subscribers toward its warm copy.
 
 Each endpoint also declares its own Hop ID at setup, so a peer can leave it out of every path it advertises or serves to it, even across several connections between the same two relays.
 An advertisement is one path, so a relay forwards only the best path it knows per namespace and serves a subscription from one source at a time ({{publishers}}).
-PUBLISH and SUBSCRIBE_TRACKS follow the same rules ({{tracks}}).
+A PUBLISH carries the path of its track the same way ({{tracks}}).
 
 
 # Setup Negotiation
@@ -132,7 +132,7 @@ An anonymous accepted session cannot be correlated with anything, so it SHOULD g
 
 # Namespace Advertisements {#namespace}
 HOP_PATH and ROUTE_COST are Key-Value-Pair parameters ({{moqt}} Section 2.5).
-PUBLISH_NAMESPACE ({{moqt}} Section 10.15) already carries parameters.
+PUBLISH_NAMESPACE ({{moqt}} Section 10.15) and PUBLISH already carry parameters.
 NAMESPACE ({{moqt}} Section 10.16) does not, and a subscriber-driven mesh propagates advertisements as NAMESPACE, so this extension appends a parameter block to it:
 
 ~~~
@@ -191,10 +191,10 @@ Unknown, out-of-budget, and saturated routes are outside the guarantee: a receiv
 
 
 # Relay Behavior
-A relay forwarding an advertisement MUST append its own Hop ID to the HOP_PATH it received, so its ID is always the last entry.
+A relay forwarding an advertisement or PUBLISH MUST append its own Hop ID to the HOP_PATH it received, so its ID is always the last entry.
 A received 0 is forwarded unchanged.
 
-A relay MUST discard an advertisement whose HOP_PATH already contains its own non-zero Hop ID: forwarding it would extend a loop, and subscribing through it would route the relay back to itself.
+A relay MUST discard an advertisement or PUBLISH whose HOP_PATH already contains its own non-zero Hop ID: forwarding it would extend a loop, and subscribing through it would route the relay back to itself.
 This check catches loops of any length and is the only loop defense required.
 A conforming sender never sends one ({{selection}}), so a receiver MAY close the session with a PROTOCOL_VIOLATION instead; discarding is what keeps the mesh working when one member does not conform.
 
@@ -260,18 +260,20 @@ One rule for advertisement and dispatch keeps advertised paths truthful and prev
 
 
 # Track Delivery {#tracks}
-PUBLISH and SUBSCRIBE_TRACKS add no parameters.
-A track is sourced along the same paths as its namespace, so the loop rules above apply to them too.
+A PUBLISH carries HOP_PATH and ROUTE_COST for its track, and the path it names is the one the track took, so the rules above apply to it as to an advertisement.
+SUBSCRIBE_TRACKS adds no parameters.
 
 A relay MUST source a track it sends in a PUBLISH from a path whose HOP_PATH does not contain the subscriber's Hop ID ({{selection}}).
 If no such path exists, it MUST NOT send that PUBLISH to the subscriber.
 
-A receiver MUST discard a PUBLISH for a namespace it holds an advertisement for from the sending peer, if that advertisement's HOP_PATH contains the receiver's own non-zero Hop ID.
-A conforming peer never sends one, since it does not advertise paths through the receiver ({{selection}}).
+A receiver MUST discard a PUBLISH whose HOP_PATH contains its own non-zero Hop ID.
+A conforming peer never sends one ({{selection}}).
 
-A SUBSCRIBE_TRACKS names a prefix, so a relay resolves it per namespace: each namespace advertised beneath the prefix resolves to its best path ({{selection}}), and a prefix with no advertised namespace beneath it resolves to its longest covering advertisement.
-The relay forwards the request to one source per namespace, so a track is never subscribed through two sources at once.
-The request stays open ({{moqt}} Section 3.6), so a namespace advertised beneath the prefix later is resolved when it is advertised, and failover between sources of one namespace follows {{publishers}}.
+A SUBSCRIBE_TRACKS names a prefix and is forwarded to every peer that advertises a namespace beneath it along a path that does not contain the subscriber's Hop ID, so each such track is published over every one of those paths.
+The request stays open ({{moqt}} Section 3.6), so a namespace advertised beneath the prefix later is covered when it is advertised.
+
+A receiver identifies a track by its namespace and name and holds one media source for it.
+It takes the first PUBLISH for a track, and a later one for the same track replaces it only when Path Selection prefers that path ({{selection}}); the replaced source is then paused, so it sends metadata but no objects, and kept as a standby ({{publishers}}).
 
 
 # Several Publishers of One Namespace {#publishers}
@@ -318,12 +320,12 @@ This document requests two registrations in the "MOQT Setup Options" registry ({
 ## MOQT Message Parameters
 
 This document requests two registrations in the "MOQT Message Parameters" registry ({{moqt}} Section 15.7).
-Both are carried in PUBLISH_NAMESPACE, in REQUEST_UPDATE of a PUBLISH_NAMESPACE ({{updating}}), and in the extended NAMESPACE message ({{namespace}}).
+Both are carried in PUBLISH_NAMESPACE, in REQUEST_UPDATE of a PUBLISH_NAMESPACE ({{updating}}), in PUBLISH, and in the extended NAMESPACE message ({{namespace}}).
 
-| Value   | Name        | Carried In                                   | Reference     |
-|:--------|:------------|:---------------------------------------------|:--------------|
-| 0x40B57 | HOP_PATH    | PUBLISH_NAMESPACE, REQUEST_UPDATE, NAMESPACE | This Document |
-| 0x40B58 | ROUTE_COST  | PUBLISH_NAMESPACE, REQUEST_UPDATE, NAMESPACE | This Document |
+| Value   | Name        | Carried In                                            | Reference     |
+|:--------|:------------|:------------------------------------------------------|:--------------|
+| 0x40B57 | HOP_PATH    | PUBLISH_NAMESPACE, REQUEST_UPDATE, PUBLISH, NAMESPACE | This Document |
+| 0x40B58 | ROUTE_COST  | PUBLISH_NAMESPACE, REQUEST_UPDATE, PUBLISH, NAMESPACE | This Document |
 
 The Key-Value-Pair parity is load-bearing: HOP_PATH is odd, so its value is a length-prefixed byte string, while HOP_ID, RELAY_COST, and ROUTE_COST are even, so their values are bare varints.
 
@@ -339,7 +341,7 @@ The Key-Value-Pair parity is load-bearing: HOP_PATH is odd, so its value is a le
 - Defined request resolution against the longest covering prefix; every refusal is terminal, including between several publishers of one namespace, and capacity is signaled only by withdrawing or re-pricing the advertisement.
 - A relay does not advertise a namespace because it resolved it; the publisher advertises the concrete namespace once producing.
 - A change of original publisher is an ordinary update instead of a withdrawal and a new advertisement.
-- PUBLISH is sourced only from a path that excludes the subscriber's Hop ID, and a receiver discards one that arrives over a path containing its own. SUBSCRIBE_TRACKS resolves per namespace beneath its prefix and is forwarded to one source per namespace.
+- PUBLISH carries HOP_PATH and ROUTE_COST, and is sourced only from a path that excludes the subscriber's Hop ID; a receiver discards one whose HOP_PATH contains its own. SUBSCRIBE_TRACKS is forwarded to every source beneath its prefix, and a receiver holds one media source per track, pausing the others as standbys.
 
 ## moq-cluster-01
 - Assigned identities are local selection state and MUST NOT be forwarded.
