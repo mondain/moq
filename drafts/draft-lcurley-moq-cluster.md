@@ -53,6 +53,7 @@ A relay that already carries a namespace advertises a lower cost, steering subsc
 
 Each endpoint also declares its own Hop ID at setup, so a peer can leave it out of every path it advertises or serves to it, even across several connections between the same two relays.
 An advertisement is one path, so a relay forwards only the best path it knows per namespace and serves a subscription from one source at a time ({{publishers}}).
+PUBLISH and SUBSCRIBE_TRACKS follow the same rules ({{tracks}}).
 
 
 # Setup Negotiation
@@ -258,6 +259,21 @@ If only excluded sources remain the subscription is unroutable, since serving it
 One rule for advertisement and dispatch keeps advertised paths truthful and prevents subscription cycles of any length.
 
 
+# Track Delivery {#tracks}
+PUBLISH and SUBSCRIBE_TRACKS add no parameters.
+A track is sourced along the same paths as its namespace, so the loop rules above apply to them too.
+
+A relay MUST source a track it sends in a PUBLISH from a path whose HOP_PATH does not contain the subscriber's Hop ID ({{selection}}).
+If no such path exists, it MUST NOT send that PUBLISH to the subscriber.
+
+A receiver MUST discard a PUBLISH for a namespace it holds an advertisement for from the sending peer, if that advertisement's HOP_PATH contains the receiver's own non-zero Hop ID.
+A conforming peer never sends one, since it does not advertise paths through the receiver ({{selection}}).
+
+A SUBSCRIBE_TRACKS names a prefix, so a relay resolves it per namespace: each namespace advertised beneath the prefix resolves to its best path ({{selection}}), and a prefix with no advertised namespace beneath it resolves to its longest covering advertisement.
+The relay forwards the request to one source per namespace, so a track is never subscribed through two sources at once.
+The request stays open ({{moqt}} Section 3.6), so a namespace advertised beneath the prefix later is resolved when it is advertised, and failover between sources of one namespace follows {{publishers}}.
+
+
 # Several Publishers of One Namespace {#publishers}
 {{moqt}} lets several publishers advertise one namespace and leaves to the relay how it serves a SUBSCRIBE among them.
 Under this extension an advertisement is a path, so a session advertises a namespace at most once, a relay forwards only the best path it knows ({{selection}}), and a subscription is served from one source at a time.
@@ -323,6 +339,7 @@ The Key-Value-Pair parity is load-bearing: HOP_PATH is odd, so its value is a le
 - Defined request resolution against the longest covering prefix; every refusal is terminal, including between several publishers of one namespace, and capacity is signaled only by withdrawing or re-pricing the advertisement.
 - A relay does not advertise a namespace because it resolved it; the publisher advertises the concrete namespace once producing.
 - A change of original publisher is an ordinary update instead of a withdrawal and a new advertisement.
+- PUBLISH is sourced only from a path that excludes the subscriber's Hop ID, and a receiver discards one that arrives over a path containing its own. SUBSCRIBE_TRACKS resolves per namespace beneath its prefix and is forwarded to one source per namespace.
 
 ## moq-cluster-01
 - Assigned identities are local selection state and MUST NOT be forwarded.
