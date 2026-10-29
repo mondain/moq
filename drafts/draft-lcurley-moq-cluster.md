@@ -272,7 +272,8 @@ A conforming peer never sends one ({{selection}}).
 
 A SUBSCRIBE_TRACKS names a prefix and is forwarded to every peer that advertises a namespace beneath the prefix or covering it, along a path that does not contain the subscriber's Hop ID, so each such track is published over every one of those paths.
 For example, a peer that advertises `a` and can serve tracks under `a/b` receives a SUBSCRIBE_TRACKS for `a/b` even when it has advertised nothing beneath it.
-A track whose publisher sent no PUBLISH_NAMESPACE is found through its edge relay, which advertises the covering namespace with ROUTE_COST 0 and a HOP_PATH of its own Hop ID, since it is the original publisher of those tracks.
+A publisher that sends no PUBLISH_NAMESPACE MUST send an unsolicited PUBLISH for each track it produces ({{moqt}} Section 3.1).
+Its edge relay then advertises the covering namespace with ROUTE_COST 0 and a HOP_PATH of its own Hop ID, since it is the original publisher of those tracks, and SUBSCRIBE_TRACKS reaches it through that advertisement.
 The request stays open ({{moqt}} Section 3.6), so a namespace advertised later is covered when it is advertised.
 
 A receiver identifies a track by its namespace, its name, and, when MoQ Epoch is negotiated, its EPOCH, and holds one media source for it.
