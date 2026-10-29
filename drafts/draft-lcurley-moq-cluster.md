@@ -70,7 +70,7 @@ HOP_ID Setup Option {
 ~~~
 
 Negotiation is per session; a relay MUST NOT assume that because one session negotiated the extension, another did.
-On a session that did, every PUBLISH_NAMESPACE and NAMESPACE MUST carry HOP_PATH, NAMESPACE takes the extended form in {{namespace}}, and a receiver MUST close the session with a PROTOCOL_VIOLATION if either arrives without HOP_PATH.
+On a session that did, every PUBLISH_NAMESPACE, PUBLISH, and NAMESPACE MUST carry HOP_PATH, NAMESPACE takes the extended form in {{namespace}}, and a receiver MUST close the session with a PROTOCOL_VIOLATION if any of them arrives without HOP_PATH.
 
 ## Relay Cost {#relay-cost}
 An endpoint MAY declare what it charges for sending content:
@@ -269,11 +269,16 @@ If no such path exists, it MUST NOT send that PUBLISH to the subscriber.
 A receiver MUST discard a PUBLISH whose HOP_PATH contains its own non-zero Hop ID.
 A conforming peer never sends one ({{selection}}).
 
-A SUBSCRIBE_TRACKS names a prefix and is forwarded to every peer that advertises a namespace beneath it along a path that does not contain the subscriber's Hop ID, so each such track is published over every one of those paths.
-The request stays open ({{moqt}} Section 3.6), so a namespace advertised beneath the prefix later is covered when it is advertised.
+A SUBSCRIBE_TRACKS names a prefix and is forwarded to every peer that advertises a namespace beneath the prefix or covering it, along a path that does not contain the subscriber's Hop ID, so each such track is published over every one of those paths.
+For example, a peer that advertises `a` and can serve tracks under `a/b` receives a SUBSCRIBE_TRACKS for `a/b` even when it has advertised nothing beneath it.
+A track whose publisher sent no PUBLISH_NAMESPACE is found through its edge relay, which advertises the covering namespace with ROUTE_COST 0 and a HOP_PATH of its own Hop ID, since it is the original publisher of those tracks.
+The request stays open ({{moqt}} Section 3.6), so a namespace advertised later is covered when it is advertised.
 
-A receiver identifies a track by its namespace and name and holds one media source for it.
-It takes the first PUBLISH for a track, and a later one for the same track replaces it only when Path Selection prefers that path ({{selection}}); the replaced source is then paused, so it sends metadata but no objects, and kept as a standby ({{publishers}}).
+A receiver identifies a track by its namespace, its name, and, when MoQ Epoch is negotiated, its EPOCH, and holds one media source for it.
+Each SUBSCRIBE_TRACKS sets Forward to 0, so every PUBLISH it causes arrives paused: metadata only, with no objects ({{moqt}} Sections 3.1.1 and 3.6.2).
+The receiver resumes the source Path Selection prefers ({{selection}}) by sending REQUEST_UPDATE with Forward set to 1 on that subscription ({{moqt}} Section 9.5).
+A later PUBLISH for the track that Path Selection prefers takes over the same way: the receiver resumes it and pauses the previous source with REQUEST_UPDATE setting Forward to 0.
+Every other source stays paused as a standby ({{publishers}}).
 
 
 # Several Publishers of One Namespace {#publishers}
@@ -341,7 +346,7 @@ The Key-Value-Pair parity is load-bearing: HOP_PATH is odd, so its value is a le
 - Defined request resolution against the longest covering prefix; every refusal is terminal, including between several publishers of one namespace, and capacity is signaled only by withdrawing or re-pricing the advertisement.
 - A relay does not advertise a namespace because it resolved it; the publisher advertises the concrete namespace once producing.
 - A change of original publisher is an ordinary update instead of a withdrawal and a new advertisement.
-- PUBLISH carries HOP_PATH and ROUTE_COST, and is sourced only from a path that excludes the subscriber's Hop ID; a receiver discards one whose HOP_PATH contains its own. SUBSCRIBE_TRACKS is forwarded to every source beneath its prefix, and a receiver holds one media source per track, pausing the others as standbys.
+- PUBLISH carries HOP_PATH and ROUTE_COST, required on a negotiated session, and is sourced only from a path that excludes the subscriber's Hop ID; a receiver discards one whose HOP_PATH contains its own. SUBSCRIBE_TRACKS is forwarded to every source beneath or covering its prefix, with Forward 0; a receiver holds one media source per track, identified by namespace, name, and EPOCH, and pauses or resumes sources with REQUEST_UPDATE.
 
 ## moq-cluster-01
 - Assigned identities are local selection state and MUST NOT be forwarded.
