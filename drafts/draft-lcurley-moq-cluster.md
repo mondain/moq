@@ -261,7 +261,8 @@ One rule for advertisement and dispatch keeps advertised paths truthful and prev
 
 # Track Delivery {#tracks}
 A PUBLISH carries HOP_PATH and ROUTE_COST for its track, and the path it names is the one the track took, so the rules above apply to it as to an advertisement.
-SUBSCRIBE_TRACKS adds no parameters.
+SUBSCRIBE_TRACKS adds no cluster parameters, but a relay MUST send it to a cluster peer with FORWARD set to 0 ({{moqt}} Sections 3.1.1 and 3.6.2), so each PUBLISH it causes arrives paused: metadata only, with no objects.
+Without it, every peer would receive every track's objects.
 
 A relay MUST source a track it sends in a PUBLISH from a path whose HOP_PATH does not contain the subscriber's Hop ID ({{selection}}).
 If no such path exists, it MUST NOT send that PUBLISH to the subscriber.
@@ -275,7 +276,6 @@ A track whose publisher sent no PUBLISH_NAMESPACE is found through its edge rela
 The request stays open ({{moqt}} Section 3.6), so a namespace advertised later is covered when it is advertised.
 
 A receiver identifies a track by its namespace, its name, and, when MoQ Epoch is negotiated, its EPOCH, and holds one media source for it.
-Each SUBSCRIBE_TRACKS sets Forward to 0, so every PUBLISH it causes arrives paused: metadata only, with no objects ({{moqt}} Sections 3.1.1 and 3.6.2).
 The receiver resumes the source Path Selection prefers ({{selection}}) by sending REQUEST_UPDATE with Forward set to 1 on that subscription ({{moqt}} Section 9.5).
 A later PUBLISH for the track that Path Selection prefers takes over the same way: the receiver resumes it and pauses the previous source with REQUEST_UPDATE setting Forward to 0.
 Every other source stays paused as a standby ({{publishers}}).
