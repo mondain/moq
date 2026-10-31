@@ -278,8 +278,8 @@ SUBSCRIBE_TRACKS reaches it through that advertisement.
 The request stays open ({{moqt}} Section 3.6), so a namespace advertised later is covered when it is advertised.
 
 A receiver identifies a track by its namespace, its name, and, when MoQ Epoch is negotiated, its EPOCH, and holds one media source for it.
-The receiver resumes the source Path Selection prefers ({{selection}}) by sending REQUEST_UPDATE with Forward set to 1 on that subscription ({{moqt}} Section 9.5).
-A later PUBLISH for the track that Path Selection prefers takes over the same way: the receiver resumes it and pauses the previous source with REQUEST_UPDATE setting Forward to 0.
+Only while it has demand for the track's objects, such as a downstream subscription, does the receiver resume the source Path Selection prefers ({{selection}}), by sending REQUEST_UPDATE with Forward set to 1 on that subscription ({{moqt}} Section 9.5); when the demand ends, it pauses that source again with REQUEST_UPDATE setting Forward to 0.
+A later PUBLISH for the track that Path Selection prefers takes over the same way: the receiver resumes it if the track has demand and pauses the previous source.
 Every other source stays paused as a standby ({{publishers}}).
 
 
