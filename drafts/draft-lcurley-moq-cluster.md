@@ -277,10 +277,11 @@ Its edge relay then advertises the covering namespace as it would forward that P
 SUBSCRIBE_TRACKS reaches it through that advertisement.
 The request stays open ({{moqt}} Section 3.6), so a namespace advertised later is covered when it is advertised.
 
-A receiver identifies a track by its namespace, its name, and, when MoQ Epoch is negotiated, its EPOCH, and holds one media source for it.
-Only while it has demand for the track's objects, such as a downstream subscription, does the receiver resume the source Path Selection prefers ({{selection}}), by sending REQUEST_UPDATE with Forward set to 1 on that subscription ({{moqt}} Section 9.5); when the demand ends, it pauses that source again with REQUEST_UPDATE setting Forward to 0.
-A later PUBLISH for the track that Path Selection prefers takes over the same way: the receiver resumes it if the track has demand and pauses the previous source.
-Every other source stays paused as a standby ({{publishers}}).
+A receiver identifies a track by its namespace, its name, and, when MoQ Epoch is negotiated, its EPOCH.
+It serves each demand for the track's objects, such as a downstream subscription, from the source Path Selection prefers among those eligible for that demand ({{selection}}), and resumes that source by sending REQUEST_UPDATE with Forward set to 1 on its subscription ({{moqt}} Section 9.5); once a source serves no demand, the receiver pauses it again with REQUEST_UPDATE setting Forward to 0.
+Demands usually share one source, but a downstream peer that the preferred path runs through is served from another, so several sources can be active at once.
+A later PUBLISH for the track that Path Selection prefers takes over the same way, but only where {{publishers}} allows moving a subscription between the two: the receiver resumes it for the demand it now serves and pauses a source left serving none.
+Every other source stays paused as a standby.
 
 
 # Several Publishers of One Namespace {#publishers}
@@ -348,7 +349,7 @@ The Key-Value-Pair parity is load-bearing: HOP_PATH is odd, so its value is a le
 - Defined request resolution against the longest covering prefix; every refusal is terminal, including between several publishers of one namespace, and capacity is signaled only by withdrawing or re-pricing the advertisement.
 - A relay does not advertise a namespace because it resolved it; the publisher advertises the concrete namespace once producing.
 - A change of original publisher is an ordinary update instead of a withdrawal and a new advertisement.
-- PUBLISH carries HOP_PATH and ROUTE_COST, required on a negotiated session, and is sourced only from a path that excludes the subscriber's Hop ID; a receiver discards one whose HOP_PATH contains its own. SUBSCRIBE_TRACKS is forwarded to every source beneath or covering its prefix, with Forward 0; a receiver holds one media source per track, identified by namespace, name, and EPOCH, and pauses or resumes sources with REQUEST_UPDATE.
+- PUBLISH carries HOP_PATH and ROUTE_COST, required on a negotiated session, and is sourced only from a path that excludes the subscriber's Hop ID; a receiver discards one whose HOP_PATH contains its own. SUBSCRIBE_TRACKS is forwarded to every source beneath or covering its prefix, with Forward 0; a receiver identifies a track by namespace, name, and EPOCH, serves each demand from the preferred source eligible for it, and pauses or resumes sources with REQUEST_UPDATE.
 
 ## moq-cluster-01
 - Assigned identities are local selection state and MUST NOT be forwarded.
